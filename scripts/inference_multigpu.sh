@@ -7,7 +7,7 @@
 
 GPUS=4 # should be 2 or 4
 VARIANT=diffusion_transformer_768p
-MODEL_PATH=PATH
+MODEL_PATH=/dev/shm/model
 TASK=t2v    # i2v for image-to-video
 
 torchrun --nproc_per_node $GPUS \

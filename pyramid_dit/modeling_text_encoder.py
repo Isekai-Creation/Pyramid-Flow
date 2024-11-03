@@ -16,18 +16,30 @@ class SD3TextEncoderWithMask(nn.Module):
     def __init__(self, model_path, torch_dtype):
         super().__init__()
         # CLIP-L
-        self.tokenizer = CLIPTokenizer.from_pretrained(os.path.join(model_path, 'tokenizer'))
+        self.tokenizer = CLIPTokenizer.from_pretrained(
+            os.path.join(model_path, "tokenizer")
+        )
         self.tokenizer_max_length = self.tokenizer.model_max_length
-        self.text_encoder = CLIPTextModelWithProjection.from_pretrained(os.path.join(model_path, 'text_encoder'), torch_dtype=torch_dtype)
+        self.text_encoder = CLIPTextModelWithProjection.from_pretrained(
+            os.path.join(model_path, "text_encoder"), torch_dtype=torch_dtype
+        )
 
         # CLIP-G
-        self.tokenizer_2 = CLIPTokenizer.from_pretrained(os.path.join(model_path, 'tokenizer_2'))
-        self.text_encoder_2 = CLIPTextModelWithProjection.from_pretrained(os.path.join(model_path, 'text_encoder_2'), torch_dtype=torch_dtype)
+        self.tokenizer_2 = CLIPTokenizer.from_pretrained(
+            os.path.join(model_path, "tokenizer_2")
+        )
+        self.text_encoder_2 = CLIPTextModelWithProjection.from_pretrained(
+            os.path.join(model_path, "text_encoder_2"), torch_dtype=torch_dtype
+        )
 
         # T5
-        self.tokenizer_3 = T5TokenizerFast.from_pretrained(os.path.join(model_path, 'tokenizer_3'))
-        self.text_encoder_3 = T5EncoderModel.from_pretrained(os.path.join(model_path, 'text_encoder_3'), torch_dtype=torch_dtype)
-    
+        self.tokenizer_3 = T5TokenizerFast.from_pretrained(
+            os.path.join(model_path, "tokenizer_3")
+        )
+        self.text_encoder_3 = T5EncoderModel.from_pretrained(
+            os.path.join(model_path, "text_encoder_3"), torch_dtype=torch_dtype
+        )
+
         self._freeze()
 
     def _freeze(self):
@@ -55,7 +67,9 @@ class SD3TextEncoderWithMask(nn.Module):
         text_input_ids = text_inputs.input_ids
         prompt_attention_mask = text_inputs.attention_mask
         prompt_attention_mask = prompt_attention_mask.to(device)
-        prompt_embeds = self.text_encoder_3(text_input_ids.to(device), attention_mask=prompt_attention_mask)[0]
+        prompt_embeds = self.text_encoder_3(
+            text_input_ids.to(device), attention_mask=prompt_attention_mask
+        )[0]
         dtype = self.text_encoder_3.dtype
         prompt_embeds = prompt_embeds.to(dtype=dtype, device=device)
 
@@ -63,7 +77,9 @@ class SD3TextEncoderWithMask(nn.Module):
 
         # duplicate text embeddings and attention mask for each generation per prompt, using mps friendly method
         prompt_embeds = prompt_embeds.repeat(1, num_images_per_prompt, 1)
-        prompt_embeds = prompt_embeds.view(batch_size * num_images_per_prompt, seq_len, -1)
+        prompt_embeds = prompt_embeds.view(
+            batch_size * num_images_per_prompt, seq_len, -1
+        )
         prompt_attention_mask = prompt_attention_mask.view(batch_size, -1)
         prompt_attention_mask = prompt_attention_mask.repeat(num_images_per_prompt, 1)
 
@@ -95,16 +111,21 @@ class SD3TextEncoderWithMask(nn.Module):
         )
 
         text_input_ids = text_inputs.input_ids
-        prompt_embeds = text_encoder(text_input_ids.to(device), output_hidden_states=True)
+        prompt_embeds = text_encoder(
+            text_input_ids.to(device), output_hidden_states=True
+        )
         pooled_prompt_embeds = prompt_embeds[0]
         pooled_prompt_embeds = pooled_prompt_embeds.repeat(1, num_images_per_prompt, 1)
-        pooled_prompt_embeds = pooled_prompt_embeds.view(batch_size * num_images_per_prompt, -1)
+        pooled_prompt_embeds = pooled_prompt_embeds.view(
+            batch_size * num_images_per_prompt, -1
+        )
 
         return pooled_prompt_embeds
 
-    def encode_prompt(self, 
-        prompt, 
-        num_images_per_prompt=1, 
+    def encode_prompt(
+        self,
+        prompt,
+        num_images_per_prompt=1,
         clip_skip: Optional[int] = None,
         device=None,
     ):
@@ -124,7 +145,9 @@ class SD3TextEncoderWithMask(nn.Module):
             clip_skip=clip_skip,
             clip_model_index=1,
         )
-        pooled_prompt_embeds = torch.cat([pooled_prompt_embed, pooled_prompt_2_embed], dim=-1)
+        pooled_prompt_embeds = torch.cat(
+            [pooled_prompt_embed, pooled_prompt_2_embed], dim=-1
+        )
 
         prompt_embeds, prompt_attention_mask = self._get_t5_prompt_embeds(
             prompt=prompt,
@@ -133,8 +156,15 @@ class SD3TextEncoderWithMask(nn.Module):
         )
         return prompt_embeds, prompt_attention_mask, pooled_prompt_embeds
 
-    def forward(self, input_prompts, device):
+    def forward(self, input_prompts, num_images_per_prompt, device):
         with torch.no_grad():
-            prompt_embeds, prompt_attention_mask, pooled_prompt_embeds = self.encode_prompt(input_prompts, 1, clip_skip=None, device=device)
+            prompt_embeds, prompt_attention_mask, pooled_prompt_embeds = (
+                self.encode_prompt(
+                    input_prompts,
+                    num_images_per_prompt=num_images_per_prompt,
+                    clip_skip=None,
+                    device=device,
+                )
+            )
 
         return prompt_embeds, prompt_attention_mask, pooled_prompt_embeds

@@ -11,12 +11,17 @@ from pyramid_dit import PyramidDiTForVideoGeneration
 from trainer_misc import init_distributed_mode, init_sequence_parallel_group
 import PIL
 from PIL import Image
-
+import torch_xla.core.xla_model as xm
 
 def get_args():
     parser = argparse.ArgumentParser('Pytorch Multi-process Script', add_help=False)
     parser.add_argument('--model_dtype', default='bf16', type=str, help="The Model Dtype: bf16")
-    parser.add_argument('--model_path', default='/home/jinyang06/models/pyramid-flow', type=str, help='Set it to the downloaded checkpoint dir')
+    parser.add_argument(
+        "--model_path",
+        default="/dev/shm/model",
+        type=str,
+        help="Set it to the downloaded checkpoint dir",
+    )
     parser.add_argument('--variant', default='diffusion_transformer_768p', type=str,)
     parser.add_argument('--task', default='t2v', type=str, choices=['i2v', 't2v'])
     parser.add_argument('--temp', default=16, type=int, help='The generated latent num, num_frames = temp * 8 + 1')
@@ -37,7 +42,7 @@ def main():
     # Enable sequence parallel
     init_sequence_parallel_group(args)
 
-    device = torch.device('cuda')
+    device = xm.xla_device()
     rank = args.rank
     model_dtype = args.model_dtype
 
